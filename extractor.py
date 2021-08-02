@@ -24,10 +24,10 @@ class Handler(FileSystemEventHandler):
     def handle_file(self, file):
         # Read JSON file
         data = json.loads(open(file).read())
-
         # Determine ACME version
         try:
-            acme_version = 2 if 'acme-v02' in data['Account']['Registration']['uri'] else 1
+
+            acme_version = 2 if 'acme-v02' in data [data.keys[0]]['Account']['Registration']['uri'] else 1
         except TypeError:
             if 'DomainsCertificate' in data:
                 acme_version = 1
@@ -37,9 +37,14 @@ class Handler(FileSystemEventHandler):
         # Find certificates
         if acme_version == 1:
             certs = data['DomainsCertificate']['Certs']
+            self.find_certificates(acme_version, certs)
         elif acme_version == 2:
-            certs = data['Certificates']
+            for resolver in data:
+                print('getting certs on resolver:' + resolver)
+                certs = data[resolver]['Certificates']
+                self.find_certificates(acme_version, certs)
 
+    def find_certificates(self, acme_version, certs):
         print('Certificate storage contains ' + str(len(certs)) + ' certificates')
 
         # Loop over all certificates
@@ -50,10 +55,21 @@ class Handler(FileSystemEventHandler):
                 fullchain = c['Certificate']['Certificate']
                 sans = c['Domains']['SANs']
             elif acme_version == 2:
-                name = c['Domain']['Main']
-                privatekey = c['Key']
-                fullchain = c['Certificate']
-                sans = c['Domain']['SANs']
+            
+                if 'domain' in c:
+                    name = c['domain']['main']
+                    privatekey = c['key']
+                    fullchain = c['certificate']
+                    sans = None
+                    if 'SANs' in c['domain']:
+                        sans = c['domain']['SANs']
+                    
+
+                else:
+                    name = c['Domain']['Main']
+                    privatekey = c['Key']
+                    fullchain = c['Certificate']
+                    sans = c['Domain']['SANs']
 
             # Decode private key, certificate and chain
             privatekey = b64decode(privatekey).decode('utf-8')
